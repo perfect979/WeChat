@@ -10,70 +10,6 @@
 - 封装 MySQL 接口，将用户数据储存到磁盘中，实现数据持久化
 - 基于 CMake 构建项目
 
-## 必要环境
-
-- 安装`boost`库
-
-  sudo apt-get install libboost-all-dev
-
-- 安装`muduo`库
-
-  git clone https://github.com/chenshuo/muduo.git
-
-  cd muduo/
-
-  mkdir -p build/release
-
-  cd build/release/
-
-  cmake ../..
-
-  make -j4
-
-  sudo make install
-
-- 安装`Nginx`
-
-- 安装`redis`
-
-  sudo apt-get install -y redis-server
-
-  sudo apt-get install -y libhiredis-dev
-
-## 构建项目
-
-创建数据库
-
-```shell
-# 连接MySQL
-mysql -u root -p your passward
-# 创建数据库
-create database chat;
-# 执行数据库脚本创建表
-source chat.sql
-```
-
-执行脚本构建项目
-
-```shell
-bash build.sh
-```
-
-## 执行生成文件
-
-```shell
-# 启动服务端
-cd ./bin
-./ChatServer 6000 
-```
-
-```shell
-# 启动客户端
-./ChatClient 127.0.0.1 8000
-```
-
-# 项目讲解
-
 ## 数据库表设计
 
 **User表** 
@@ -117,31 +53,6 @@ cd ./bin
 
 ## 网络模块设计
 
-我们会使用 muduo 完成网络模块的代码，在这之前我们需要了解 muduo 的基本使用。
-
-muduo 的线程模型为「one loop per thread + threadPool」模型。一个线程对应一个事件循环（EventLoop），也对应着一个 Reactor 模型。EventLoop 负责 IO 和定时器事件的分派。
-
-muduo 是主从 Reactor 模型，有 `mainReactor` 和 `subReactor`。`mainReactor`通过 `Acceptor` 接收新连接，然后将新连接派发到 `subReactor` 上进行连接的维护。这样 `mainReactor` 可以只专注于监听新连接的到来，而从维护旧连接的业务中得到解放。同时多个 `Reactor` 可以并行运行在多核 CPU 中，增加服务效率。因此我们可以通过 muduo 快速完成网络模块。
-
-![](https://cdn.nlark.com/yuque/0/2022/png/26752078/1663324955126-3a8078fe-f271-4a1b-82c7-b75edff3cda8.png?x-oss-process=image%2Fresize%2Cw_720%2Climit_0#crop=0&crop=0&crop=1&crop=1&from=url&height=345&id=Jzfh0&margin=%5Bobject%20Object%5D&originHeight=435&originWidth=720&originalType=binary&ratio=1&rotation=0&showTitle=false&status=done&style=none&title=&width=571)
-
-使用 muduo 注册消息事件到来的回调函数，并根据得到的 `MSGID` 定位到不同的处理函数中。以此实现业务模块和网络模块的解耦。
-
-```cpp
-// 上报读写事件相关信息的回调函数
-void ChatServer::onMessage(const TcpConnectionPtr &conn,
-                           Buffer *buffer,
-                           Timestamp time)
-{
-    string buf = buffer->retrieveAllAsString();
-    json js = json::parse(buf);
-    
-	// 业务模块和网络模块解耦
-    auto msgHandler = ChatService::instance()->getHandler(js["msgid"].get<int>());
-    // 回调消息绑定好的事件处理器，来执行相应的业务处理
-    msgHandler(conn, js, time);
-}
-```
 
 ## 业务模块设计
 
@@ -177,32 +88,6 @@ void ChatServer::onMessage(const TcpConnectionPtr &conn,
 创建群组需要描述群组名称，群组的描述，然后调用 model 层方法在数据库中记录新群组信息。
 加入群组需要给出用户 ID 和想要加入群组的 ID，其中会显示该用户是群组的普通成员还是创建者。
 群组聊天给出群组 ID 和聊天信息，群内成员在线会直接接收到。
-
-## 使用Nginx负载均衡模块
-
-### 负载均衡是什么
-
-假设一台机器支持两万的并发量，现在我们需要保证八万的并发量。首先想到的是升级服务器的配置，比如提高 CPU 执行频率，加大内存等提高机器的物理性能来解决此问题。但是单台机器的性能毕竟是有限的，而且也有着摩尔定律也日已失效。
-
-这个时候我们就可以增加服务器的数量，将用户请求分发到不同的服务器上分担压力，这就是负载均衡。那我们就需要有一个第三方组件充当负载均衡器，由它负责将不同的请求分发到不同的服务器上。而本项目，我们选择 `Nginx` 的负载均衡功能。
-
-![](https://cdn.nlark.com/yuque/0/2022/png/26752078/1663746624651-351f9bcb-4ed5-40cd-9f2f-1b72c9964316.png#crop=0&crop=0&crop=1&crop=1&from=url&id=i9BRn&margin=%5Bobject%20Object%5D&originHeight=494&originWidth=967&originalType=binary&ratio=1&rotation=0&showTitle=false&status=done&style=none&title=)
-
-选择 `Nginx` 的 `tcp` 负载均衡模块的原因：
-
-1. 把`client`的请求按照负载算法分发到具体的业务服务器`ChatServer`上
-2. 能够`ChantServer`保持心跳机制，检测`ChatServer`故障
-3. 能够发现新添加的`ChatServer`设备，方便扩展服务器数量
-
-### 配置负载均衡
-
-![](https://cdn.nlark.com/yuque/0/2022/png/26752078/1663732379258-4c925576-3374-4f0d-8274-6031a8366536.png#crop=0&crop=0&crop=1&crop=1&from=url&id=ARrJw&margin=%5Bobject%20Object%5D&originHeight=402&originWidth=810&originalType=binary&ratio=1&rotation=0&showTitle=false&status=done&style=none&title=)
-
-配置好后，重新加载配置文件启动。
-
-```shell
-/usr/local/nginx/sbin/nginx -s reload
-```
 
 ## redis发布-订阅功能解决跨服务器通信问题
 
