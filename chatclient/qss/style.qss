@@ -1,0 +1,48 @@
+#LoginDialog{
+    background-image: url(:/images/loginWndBack.jpg); /* 设置背景图路径 */
+    background-repeat: no-repeat; /* 背景图不重复 */
+    background-position: center; /* 背景图居中 */
+}
+
+QPushButton#btn_closedialog:hover {
+    background-color:red;
+}
+
+/*QLineEdit[placeholderText] {
+    color: white;
+}*/
+
+#tab_page::pane {
+    border: none;
+    background: transparent; /*#background: #f0f0f0;*/
+}
+
+
+QTabBar::tab {
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+#LoginDialog  QPushButton{
+    background: transparent;
+    color: #FFFFFF; /* 设置字体颜色 */
+    border: 1px solid white;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+#label_tip[state='error']{
+    color: red;
+}
+#label_tip[state='normal']{
+    color: white;
+}
+
+
+#LoginDialog QMessageBox QPushButton {
+    color: black;
+}
+
